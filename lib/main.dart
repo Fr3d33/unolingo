@@ -4,7 +4,16 @@ import 'theme/app_theme.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 void main() async {
-  await dotenv.load();
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  try {
+    await dotenv.load();
+    print("Environment variables loaded successfully");
+  } catch (e) {
+    print("Failed to load environment variables: $e");
+    // Application will continue but may have limited functionality
+  }
+  
   runApp(const LanguageLearningApp());
 }
 

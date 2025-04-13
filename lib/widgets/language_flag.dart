@@ -137,7 +137,7 @@ class LanguageFlag extends StatelessWidget {
       case 'mandarin':
         return Container(
           color: Colors.red,
-          child: Center(
+          child: const Center(
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [

@@ -6,6 +6,7 @@ import 'package:deepseek/deepseek.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import '../theme/duolingo_theme.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class VideoChatScreen extends StatefulWidget {
   const VideoChatScreen({Key? key}) : super(key: key);
@@ -15,16 +16,19 @@ class VideoChatScreen extends StatefulWidget {
 }
 
 class _VideoChatScreenState extends State<VideoChatScreen> with SingleTickerProviderStateMixin {
-  SpeechToText _speechToText = SpeechToText();
+  final SpeechToText _speechToText = SpeechToText();
+  bool _isRecording = false;
   String _selectedLanguage = 'Spanish';
   bool _speechEnabled = false;
   String _lastWords = '';
-  FlutterTts _flutterTts = FlutterTts();
+  final FlutterTts _flutterTts = FlutterTts();
   bool _isProcessing = false;
   bool _isListening = false;
   bool _isSpeaking = false;
   late AnimationController _characterAnimationController;
   late Animation<double> _characterAnimation;
+  bool _hasPermission = false;
+  String _status = "Warte auf Mikro-Rechte...";
 
   final List<String> _availableLanguages = [
     'Spanish',
@@ -38,23 +42,23 @@ class _VideoChatScreenState extends State<VideoChatScreen> with SingleTickerProv
   @override
   void initState() {
     super.initState();
-    _initSpeech();
-    _initializeTTS();
-    _initializeAnimations();
-  }
-
-  void _initializeAnimations() {
+    
+    // Initialize animation controller
     _characterAnimationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 800),
-    )..repeat(reverse: true);
+      duration: const Duration(milliseconds: 300),
+    );
     
-    _characterAnimation = Tween<double>(begin: 0.95, end: 1.05).animate(
+    _characterAnimation = Tween<double>(begin: 1.0, end: 1.1).animate(
       CurvedAnimation(
         parent: _characterAnimationController,
         curve: Curves.easeInOut,
       ),
     );
+    
+    _initSpeech();
+    _initializeTTS();
+    _initMic();
   }
 
   @override
@@ -67,7 +71,7 @@ class _VideoChatScreenState extends State<VideoChatScreen> with SingleTickerProv
   Future<String> getAIResponse(String inputText) async {
     final apiKey = dotenv.env['API_KEY'] ?? '';
     if (apiKey.isEmpty) {
-      throw Exception('API Key not found in .env file');
+      return "API Key not found in .env file";
     }
 
     final deepSeek = DeepSeek(apiKey);
@@ -77,7 +81,7 @@ class _VideoChatScreenState extends State<VideoChatScreen> with SingleTickerProv
         messages: [
           Message(
             role: "user",
-            content: 'Du bist ein Sprachassistent. Antworte mir bitte in der Sprache: ${_selectedLanguage}. Ich werde dir jetzt etwas sagen: "$inputText". Antworte mir bitte basierend auf diesem Text. Baue keine Anmerkungen etc ein einfach nur den Text'
+            content: 'Du bist ein Sprachassistent. Antworte mir bitte in der Sprache: $_selectedLanguage. Ich werde dir jetzt etwas sagen: "$inputText". Antworte mir bitte basierend auf diesem Text. Baue keine Anmerkungen etc ein einfach nur den Text'
           )
         ],
         model: Models.chat.name,
@@ -89,7 +93,7 @@ class _VideoChatScreenState extends State<VideoChatScreen> with SingleTickerProv
 
       String aiResponse = response.text;
       if (aiResponse.isEmpty) {
-        throw Exception('Empty response from AI');
+        return "Empty response from AI";
       }
       
       return aiResponse;
@@ -109,14 +113,51 @@ class _VideoChatScreenState extends State<VideoChatScreen> with SingleTickerProv
     _flutterTts.setStartHandler(() {
       setState(() {
         _isSpeaking = true;
+        _characterAnimationController.repeat(reverse: true);
       });
     });
     
     _flutterTts.setCompletionHandler(() {
       setState(() {
         _isSpeaking = false;
+        _characterAnimationController.stop();
+        _characterAnimationController.reset();
       });
     });
+  }
+
+  Future<void> _initMic() async {
+    final status = await Permission.microphone.request();
+
+    if (status.isGranted) {
+      bool available = await _speechToText.initialize();
+      setState(() {
+        _hasPermission = true;
+        _speechEnabled = available;
+        _status = available ? "Bereit zum Zuhören" : "Spracherkennung nicht verfügbar";
+      });
+    } else {
+      setState(() {
+        _status = "Mikrofon-Rechte verweigert";
+      });
+    }
+  }
+
+  Future<void> _toggleMic() async {
+    if (_isListening) {
+      await _speechToText.stop();
+      setState(() {
+        _isListening = false;
+      });
+    } else {
+      bool available = await _speechToText.initialize();
+      if (available) {
+        await _speechToText.listen(onResult: _onSpeechResult);
+        setState(() {
+          _isListening = true;
+        });
+      }
+    }
   }
 
   void speakAIResponse(String aiResponse) async {
@@ -188,6 +229,48 @@ class _VideoChatScreenState extends State<VideoChatScreen> with SingleTickerProv
 
   @override
   Widget build(BuildContext context) {
+    if (!_hasPermission) {
+      return Scaffold(
+        backgroundColor: Colors.grey[900],
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                _status,
+                style: GoogleFonts.nunito(
+                  textStyle: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: _initMic,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: DuolingoTheme.primaryColor,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text(
+                  "Mikrofon-Zugriff erlauben",
+                  style: GoogleFonts.nunito(
+                    textStyle: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    
     return Scaffold(
       backgroundColor: DuolingoTheme.backgroundColor,
       body: SafeArea(
@@ -250,7 +333,7 @@ class _VideoChatScreenState extends State<VideoChatScreen> with SingleTickerProv
                 Container(
                   width: 24,
                   height: 24,
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     color: DuolingoTheme.primaryColor,
                     shape: BoxShape.circle,
                   ),
@@ -341,26 +424,25 @@ class _VideoChatScreenState extends State<VideoChatScreen> with SingleTickerProv
         builder: (context, child) {
           return Transform.scale(
             scale: _isSpeaking ? _characterAnimation.value : 1.0,
-            child: Container(
+            child: SizedBox(
               width: 120,
               height: 120,
-              decoration: BoxDecoration(
-                color: DuolingoTheme.primaryColor.withOpacity(0.2),
-                shape: BoxShape.circle,
-              ),
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  Image.asset(
-                    'assets/images/duo_character.png',
+                  // Character avatar placeholder
+                  Container(
+                    width: 100,
                     height: 100,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Icon(
-                        Icons.emoji_emotions,
-                        size: 60,
-                        color: DuolingoTheme.primaryColor,
-                      );
-                    },
+                    decoration: const BoxDecoration(
+                      color: DuolingoTheme.accentColor,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.emoji_people,
+                      color: Colors.white,
+                      size: 60,
+                    ),
                   ),
                   if (_isSpeaking)
                     Positioned(
@@ -368,7 +450,7 @@ class _VideoChatScreenState extends State<VideoChatScreen> with SingleTickerProv
                       right: 20,
                       child: Container(
                         padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
+                        decoration: const BoxDecoration(
                           color: DuolingoTheme.accentColor,
                           shape: BoxShape.circle,
                         ),
@@ -409,6 +491,7 @@ class _VideoChatScreenState extends State<VideoChatScreen> with SingleTickerProv
           if (_isListening || _isProcessing)
             Container(
               padding: const EdgeInsets.all(12),
+              margin: const EdgeInsets.only(bottom: 20),
               decoration: BoxDecoration(
                 color: DuolingoTheme.primaryColor.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(16),
@@ -424,7 +507,7 @@ class _VideoChatScreenState extends State<VideoChatScreen> with SingleTickerProv
                   Text(
                     _isListening ? 'Ich höre zu...' : 'Verarbeite...',
                     style: GoogleFonts.nunito(
-                      textStyle: TextStyle(
+                      textStyle: const TextStyle(
                         color: DuolingoTheme.primaryColor,
                         fontWeight: FontWeight.bold,
                       ),
@@ -453,7 +536,7 @@ class _VideoChatScreenState extends State<VideoChatScreen> with SingleTickerProv
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
+                        const Icon(
                           Icons.volume_up,
                           color: DuolingoTheme.primaryColor,
                           size: 18,
@@ -462,7 +545,7 @@ class _VideoChatScreenState extends State<VideoChatScreen> with SingleTickerProv
                         Text(
                           'Spricht...',
                           style: GoogleFonts.nunito(
-                            textStyle: TextStyle(
+                            textStyle: const TextStyle(
                               color: DuolingoTheme.primaryColor,
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
@@ -537,11 +620,7 @@ class _VideoChatScreenState extends State<VideoChatScreen> with SingleTickerProv
             icon: _isListening ? Icons.mic : Icons.mic_off,
             color: _isListening ? DuolingoTheme.primaryColor : Colors.grey[700]!,
             onPressed: () {
-              if (!_isListening) {
-                _startListening();
-              } else {
-                _stopListening();
-              }
+              _toggleMic();
             },
             label: _isListening ? 'Zuhören' : 'Mikrofon',
           ),
@@ -549,13 +628,7 @@ class _VideoChatScreenState extends State<VideoChatScreen> with SingleTickerProv
             icon: Icons.videocam,
             color: Colors.green,
             onPressed: () {
-              // Fehler vermeiden - nur starten, wenn nicht bereits aktiv
-              if (!_speechToText.isListening && !_isProcessing) {
-                _speechToText.listen(onResult: _onSpeechResult);
-                setState(() {
-                  _isListening = true;
-                });
-              }
+              _startListening();
             },
             label: 'Video',
           ),
@@ -621,4 +694,3 @@ class _VideoChatScreenState extends State<VideoChatScreen> with SingleTickerProv
     );
   }
 }
-

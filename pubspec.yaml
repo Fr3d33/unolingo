@@ -19,6 +19,8 @@ dependencies:
   deepseek: ^1.2.0
   flutter_tts: ^4.2.2
   google_fonts: ^4.0.4
+  flutter_sound: ^9.28.0
+  permission_handler: ^12.0.0+1
 
   # Text-Chat-Abhängigkeiten entfernt
   # intl: ^0.18.0
@@ -31,5 +33,5 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - assets/.env
-    - assets/images/duo_character.svg
+    - .env
+    - assets/images/
