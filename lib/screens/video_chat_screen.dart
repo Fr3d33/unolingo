@@ -17,7 +17,7 @@ class VideoChatScreen extends StatefulWidget {
 
 class _VideoChatScreenState extends State<VideoChatScreen> with SingleTickerProviderStateMixin {
   final SpeechToText _speechToText = SpeechToText();
-  bool _isRecording = false;
+  final bool _isRecording = false;
   String _selectedLanguage = 'Spanish';
   bool _speechEnabled = false;
   String _lastWords = '';

@@ -9,10 +9,10 @@ class AppTheme {
   static ThemeData get lightTheme {
     return ThemeData(
       primaryColor: primaryColor,
-      colorScheme: ColorScheme.light(
+      colorScheme: const ColorScheme.light(
         primary: primaryColor,
         secondary: secondaryColor,
-        background: backgroundColor,
+        surface: backgroundColor,
       ),
       scaffoldBackgroundColor: backgroundColor,
       appBarTheme: const AppBarTheme(
@@ -42,10 +42,10 @@ class AppTheme {
   static ThemeData get darkTheme {
     return ThemeData(
       primaryColor: primaryColor,
-      colorScheme: ColorScheme.dark(
+      colorScheme: const ColorScheme.dark(
         primary: primaryColor,
         secondary: secondaryColor,
-        background: darkBackgroundColor,
+        surface: darkBackgroundColor,
       ),
       scaffoldBackgroundColor: darkBackgroundColor,
       appBarTheme: const AppBarTheme(
