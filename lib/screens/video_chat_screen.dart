@@ -278,7 +278,7 @@ class _VideoChatScreenState extends State<VideoChatScreen> with SingleTickerProv
           children: [
             _buildLanguageSelector(),
             _buildLessonHeader(),
-            Expanded(
+            SizedBox(
               child: Stack(
                 children: [
                   _buildCharacter(),
@@ -370,7 +370,7 @@ class _VideoChatScreenState extends State<VideoChatScreen> with SingleTickerProv
       ),
       child: Row(
         children: [
-          Expanded(
+          SizedBox(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
